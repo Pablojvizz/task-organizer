@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Organizador de Tareas Semanal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            overflow: hidden;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+
+        .weeks-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            scroll-snap-type: y mandatory;
+            position: relative;
+            height: calc(100vh - 120px);
+            padding-bottom: 120px;
+        }
+
+        .week-container {
+            height: calc(100vh - 120px);
+            scroll-snap-align: start;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .week-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            height: calc(100% - 40px);
+        }
+
+        .day-column {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 160px);
+        }
+
+        .day-header {
+            text-align: center;
+            padding: 10px;
+            background-color: #4a90e2;
+            color: white;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .task-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            height: 100%;
+            transition: background-color 0.2s;
+            scrollbar-width: auto;
+            scrollbar-color: #888 #f1f1f1;
+        }
+
+        .task-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .task-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+
+        .task-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 5px;
+        }
+
+        .task-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .task-container.drag-over {
+            background-color: #f0f0f0;
+        }
+
+        .task {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            touch-action: none;
+        }
+
+        .task.dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+        }
+
+        .task .delete-btn {
+            color: #ff4444;
+            padding: 10px;
+            margin: -10px;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+
+        .task .delete-btn:hover {
+            color: #cc0000;
+        }
+
+        .icon-bar {
+            display: flex;
+            overflow-x: auto;
+            padding: 20px;
+            background-color: #fff;
+            border-top: 1px solid #ddd;
+            height: 120px;
+            scroll-snap-type: x proximity;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+
+        .task-icon {
+            min-width: 80px;
+            height: 80px;
+            margin: 0 10px;
+            background-color: #e9ecef;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: move;
+            scroll-snap-align: start;
+            touch-action: none;
+        }
+
+        .task-icon.dragging {
+            opacity: 0.5;
+            transform: scale(1.05);
+        }
+
+        .task-icon i {
+            font-size: 24px;
+            color: #333;
+        }
+
+        .week-header {
+            text-align: center;
+            padding: 10px;
+            font-size: 1.2em;
+            color: #333;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            background-color: #f5f5f5;
+            z-index: 1;
+        }
+
+        .icon-bar::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .icon-bar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .icon-bar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .icon-bar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        @media (max-width: 768px) {
+            .week-grid {
+                gap: 5px;
+            }
+
+            .day-header {
+                font-size: 0.9em;
+                padding: 5px;
+            }
+
+            .task {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="weeks-container" id="weeksContainer">
+            <!-- Las semanas se generarán dinámicamente -->
+        </div>
+        
+        <div class="icon-bar" id="iconBar">
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-futbol">
+                <i class="fa-solid fa-futbol"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fas fa-graduation-cap">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fas fa-dumbbell">
+                <i class="fas fa-dumbbell"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-person-walking">
+                <i class="fa-solid fa-person-walking"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-book-open">
+                <i class="fa-solid fa-book-open"> +10</i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fas fa-book">
+                <i class="fas fa-book"> 10</i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-bicycle">
+                <i class="fa-solid fa-bicycle"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-guitar">
+                <i class="fa-solid fa-guitar"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-bath">
+                <i class="fa-solid fa-bath"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-person-running">
+                <i class="fa-solid fa-person-running"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-person-swimming">
+                <i class="fa-solid fa-person-swimming"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-masks-theater">
+                <i class="fa-solid fa-masks-theater"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-drum">
+                <i class="fa-solid fa-drum"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-dog">
+                <i class="fa-solid fa-dog"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-om">
+                <i class="fa-solid fa-om"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-shrimp">
+                <i class="fa-solid fa-shrimp"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="fa-solid fa-hammer">
+                <i class="fa-solid fa-hammer"></i>
+            </div>
+            <div class="task-icon" draggable="true" data-icon="ingles">
+                <i class="ingles">INGLES</i>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const weeksContainer = document.getElementById('weeksContainer');
+            const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            let currentWeek = 3;
+            let draggedElement = null;
+            let draggedIconClass = null;
+            let touchOffset = { x: 0, y: 0 };
+            
+            // Sistema de persistencia
+            const StorageSystem = {
+                save: function(tasks) {
+                    try {
+                        localStorage.setItem('weeklyTasks', JSON.stringify(tasks));
+                    } catch (e) {
+                        console.error('Error saving tasks:', e);
+                    }
+                },
+                
+                load: function() {
+                    try {
+                        const saved = localStorage.getItem('weeklyTasks');
+                        return saved ? JSON.parse(saved) : {};
+                    } catch (e) {
+                        console.error('Error loading tasks:', e);
+                        return {};
+                    }
+                }
+            };
+
+            // Cargar tareas guardadas
+            let savedTasks = StorageSystem.load();
+
+            function createWeek(weekNumber) {
+                const weekContainer = document.createElement('div');
+                weekContainer.className = 'week-container';
+                weekContainer.dataset.week = weekNumber;
+                
+                const weekHeader = document.createElement('div');
+                weekHeader.className = 'week-header';
+                weekHeader.textContent = `Semana ${weekNumber + 1}`;
+                weekContainer.appendChild(weekHeader);
+                
+                const weekGrid = document.createElement('div');
+                weekGrid.className = 'week-grid';
+                
+                for (let day = 0; day < 7; day++) {
+                    const dayColumn = document.createElement('div');
+                    dayColumn.className = 'day-column';
+                    
+                    const dayHeader = document.createElement('div');
+                    dayHeader.className = 'day-header';
+                    dayHeader.textContent = daysOfWeek[day];
+                    
+                    const taskContainer = document.createElement('div');
+                    taskContainer.className = 'task-container';
+                    taskContainer.dataset.week = weekNumber;
+                    taskContainer.dataset.day = day;
+                    
+                    // Cargar tareas guardadas
+                    if (savedTasks[weekNumber]?.[day]) {
+                        savedTasks[weekNumber][day].forEach(taskData => {
+                            const task = createTask(taskData.icon);
+                            taskContainer.appendChild(task);
+                        });
+                    }
+                    
+                    dayColumn.appendChild(dayHeader);
+                    dayColumn.appendChild(taskContainer);
+                    weekGrid.appendChild(dayColumn);
+                }
+                
+                weekContainer.appendChild(weekGrid);
+                return weekContainer;
+            }
+
+            function saveTasks() {
+                const tasks = {};
+                document.querySelectorAll('.task-container').forEach(container => {
+                    const week = parseInt(container.dataset.week);
+                    const day = parseInt(container.dataset.day);
+                    
+                    if (!tasks[week]) tasks[week] = {};
+                    if (!tasks[week][day]) tasks[week][day] = [];
+                    
+                    container.querySelectorAll('.task').forEach(task => {
+                        const icon = task.querySelector('i:not(.delete-btn)').className;
+                        tasks[week][day].push({ icon });
+                    });
+                });
+                
+                StorageSystem.save(tasks);
+            }
+
+            function createTask(iconClass) {
+                const task = document.createElement('div');
+                task.className = 'task';
+                task.draggable = true;
+                
+                const icon = document.createElement('i');
+                icon.className = iconClass;
+                
+                const deleteBtn = document.createElement('i');
+                deleteBtn.className = 'fas fa-times delete-btn';
+                if(iconClass=="fa-solid fa-book-open"){
+                    const newContent = document.createTextNode(" +10");
+                    icon.appendChild(newContent);
+                }else if(iconClass=="fas fa-book"){
+                    const newContent2 = document.createTextNode(" 10");
+                    icon.appendChild(newContent2);
+                }else if(iconClass=="ingles"){
+                    const newContent3 = document.createTextNode("INGLES");
+                    icon.appendChild(newContent3);
+                }
+                // Modificamos el evento de borrado
+                deleteBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    task.removeEventListener('touchstart', handleTouchStart);
+                    task.removeEventListener('touchmove', handleTouchMove);
+                    task.removeEventListener('touchend', handleTouchEnd);
+                    task.remove();
+                    saveTasks();
+                }, { passive: false });
+                
+                task.appendChild(icon);
+                task.appendChild(deleteBtn);
+                
+                
+                // Separamos los eventos táctiles en funciones nombradas para poder eliminarlos
+                const handleTouchStart = function(e) {
+                    // Verificar si el toque fue en el botón de borrado
+                    const touch = e.touches[0];
+                    const deleteBtn = this.querySelector('.delete-btn');
+                    const deleteBtnRect = deleteBtn.getBoundingClientRect();
+                    
+                    if (touch.clientX >= deleteBtnRect.left && 
+                        touch.clientX <= deleteBtnRect.right && 
+                        touch.clientY >= deleteBtnRect.top && 
+                        touch.clientY <= deleteBtnRect.bottom) {
+                        return; // No iniciar arrastre si se tocó el botón de borrado
+                    }
+                    
+                    const rect = this.getBoundingClientRect();
+                    touchOffset.x = touch.clientX - rect.left;
+                    touchOffset.y = touch.clientY - rect.top;
+                    
+                    draggedElement = this;
+                    draggedIconClass = iconClass;
+                    
+                    const clone = this.cloneNode(true);
+                    clone.classList.add('dragging');
+                    clone.style.position = 'absolute';
+                    clone.style.left = touch.clientX - touchOffset.x + 'px';
+                    clone.style.top = touch.clientY - touchOffset.y + 'px';
+                    document.body.appendChild(clone);
+                    
+                    this.style.opacity = '0.5';
+                    e.preventDefault();
+                };
+
+                const handleTouchMove = function(e) {
+                    if (!draggedElement) return;
+                    
+                    const touch = e.touches[0];
+                    const clone = document.querySelector('.dragging');
+                    if (clone) {
+                        clone.style.left = touch.clientX - touchOffset.x + 'px';
+                        clone.style.top = touch.clientY - touchOffset.y + 'px';
+                    }
+                    
+                    const elementAtPoint = document.elementFromPoint(
+                        touch.clientX,
+                        touch.clientY
+                    );
+                    const container = elementAtPoint?.closest('.task-container');
+                    
+                    document.querySelectorAll('.task-container').forEach(cont => {
+                        cont.classList.remove('drag-over');
+                    });
+                    
+                    if (container) {
+                        container.classList.add('drag-over');
+                    }
+                    
+                    e.preventDefault();
+                };
+
+                const handleTouchEnd = function(e) {
+                    if (!draggedElement) return;
+                    
+                    const touch = e.changedTouches[0];
+                    const clone = document.querySelector('.dragging');
+                    if (clone) {
+                        clone.remove();
+                    }
+                    
+                    const elementAtPoint = document.elementFromPoint(
+                        touch.clientX,
+                        touch.clientY
+                    );
+                    const container = elementAtPoint?.closest('.task-container');
+                    
+                    if (container && container !== this.parentElement) {
+                        const newTask = createTask(draggedIconClass);
+                        container.appendChild(newTask);
+                        saveTasks();
+                    }
+                    
+                    this.style.opacity = '1';
+                    draggedElement = null;
+                    draggedIconClass = null;
+                    
+                    document.querySelectorAll('.task-container').forEach(cont => {
+                        cont.classList.remove('drag-over');
+                    });
+                };
+
+                // Agregamos los eventos táctiles
+                task.addEventListener('touchstart', handleTouchStart, { passive: false });
+                task.addEventListener('touchmove', handleTouchMove, { passive: false });
+                task.addEventListener('touchend', handleTouchEnd);
+                
+                // Eventos de mouse
+                task.addEventListener('dragstart', function(e) {
+                    handleDragStart(e, this, iconClass);
+                });
+
+                task.addEventListener('dragend', function() {
+                    handleDragEnd(this);
+                });
+                
+                return task;
+            }
+
+            function setupDragAndTouch(element, iconClass) {
+                // Mouse events
+                element.addEventListener('dragstart', function(e) {
+                    handleDragStart(e, this, iconClass);
+                });
+
+                element.addEventListener('dragend', function() {
+                    handleDragEnd(this);
+                });
+
+                // Touch events
+                element.addEventListener('touchstart', function(e) {
+                    const touch = e.touches[0];
+                    const rect = element.getBoundingClientRect();
+                    touchOffset.x = touch.clientX - rect.left;
+                    touchOffset.y = touch.clientY - rect.top;
+                    
+                    draggedElement = this;
+                    draggedIconClass = iconClass;
+                    
+                    // Crear clon para arrastrar
+                    const clone = this.cloneNode(true);
+                    clone.classList.add('dragging');
+                    clone.style.position = 'absolute';
+                    clone.style.left = touch.clientX - touchOffset.x + 'px';
+                    clone.style.top = touch.clientY - touchOffset.y + 'px';
+                    document.body.appendChild(clone);
+                    
+                    this.style.opacity = '0.5';
+                    e.preventDefault();
+                }, { passive: false });
+
+                element.addEventListener('touchmove', function(e) {
+                    if (!draggedElement) return;
+                    
+                    const touch = e.touches[0];
+                    const clone = document.querySelector('.dragging');
+                    if (clone) {
+                        clone.style.left = touch.clientX - touchOffset.x + 'px';
+                        clone.style.top = touch.clientY - touchOffset.y + 'px';
+                    }
+                    
+                    const elementAtPoint = document.elementFromPoint(
+                        touch.clientX,
+                        touch.clientY
+                    );
+                    const container = elementAtPoint?.closest('.task-container');
+                    
+                    document.querySelectorAll('.task-container').forEach(cont => {
+                        cont.classList.remove('drag-over');
+                    });
+                    
+                    if (container) {
+                        container.classList.add('drag-over');
+                    }
+                    
+                    e.preventDefault();
+                }, { passive: false });
+
+                element.addEventListener('touchend', function(e) {
+                    if (!draggedElement) return;
+                    
+                    const touch = e.changedTouches[0];
+                    const clone = document.querySelector('.dragging');
+                    if (clone) {
+                        clone.remove();
+                    }
+                    
+                    const elementAtPoint = document.elementFromPoint(
+                        touch.clientX,
+                        touch.clientY
+                    );
+                    const container = elementAtPoint?.closest('.task-container');
+                    
+                    if (container) {
+                        const newTask = createTask(draggedIconClass);
+                        container.appendChild(newTask);
+                        saveTasks();
+                    }
+                    
+                    this.style.opacity = '1';
+                    draggedElement = null;
+                    draggedIconClass = null;
+                    
+                    document.querySelectorAll('.task-container').forEach(cont => {
+                        cont.classList.remove('drag-over');
+                    });
+                });
+            }
+
+            function handleDragStart(e, element, iconClass) {
+                if (e.type === 'touchstart') {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    element.touchStartX = touch.clientX;
+                    element.touchStartY = touch.clientY;
+                    window.draggedElement = element;
+                    window.draggedIconClass = iconClass;
+                } else {
+                    e.dataTransfer.setData('text/plain', iconClass);
+                }
+                element.classList.add('dragging');
+            }
+
+            function handleDragMove(e, element) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                
+                if (window.draggedElement) {
+                    const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const container = elementAtPoint?.closest('.task-container');
+                    
+                    document.querySelectorAll('.task-container').forEach(cont => {
+                        cont.classList.remove('drag-over');
+                    });
+
+                    if (container) {
+                        container.classList.add('drag-over');
+                    }
+                }
+            }
+
+            function handleDragEnd(element) {
+                element.classList.remove('dragging');
+                document.querySelectorAll('.task-container').forEach(cont => {
+                    cont.classList.remove('drag-over');
+                });
+                window.draggedElement = null;
+                window.draggedIconClass = null;
+            }
+
+            function handleDrop(e) {
+                let container;
+                let iconClass;
+                
+                if (e.type === 'touchend') {
+                    const touch = e.changedTouches[0];
+                    const dropElement = document.elementFromPoint(touch.clientX, touch.clientY);
+                    container = dropElement?.closest('.task-container');
+                    iconClass = window.draggedIconClass;
+                } else {
+                    container = e.target.closest('.task-container');
+                    iconClass = e.dataTransfer.getData('text/plain');
+                }
+                
+                if (container && iconClass) {
+                    const task = createTask(iconClass);
+                    container.appendChild(task);
+                    saveTasks();
+                }
+            }
+
+            // Generar semanas iniciales
+            for (let i = 0; i < 4; i++) {
+                weeksContainer.appendChild(createWeek(i));
+            }
+
+            // Infinite scroll
+            weeksContainer.addEventListener('scroll', function() {
+                if (weeksContainer.scrollTop + weeksContainer.clientHeight >= weeksContainer.scrollHeight - 100) {
+                    weeksContainer.appendChild(createWeek(++currentWeek));
+                }
+            });
+
+            // Configurar eventos de arrastre para los iconos de la barra
+            document.querySelectorAll('.task-icon').forEach(icon => {
+                setupDragAndTouch(icon, icon.dataset.icon);
+            });
+
+            // Eventos de arrastre generales
+            document.addEventListener('dragover', function(e) {
+                const container = e.target.closest('.task-container');
+                if (container) {
+                    e.preventDefault();
+                    container.classList.add('drag-over');
+                }
+            });
+
+            document.addEventListener('dragleave', function(e) {
+                const container = e.target.closest('.task-container');
+                if (container) {
+                    container.classList.remove('drag-over');
+                }
+            });
+
+            document.addEventListener('drop', function(e) {
+                handleDrop(e);
+            });
+        });
+    </script>
+</body>
+</html>
